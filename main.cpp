@@ -2,7 +2,6 @@
  *  #Include declarations
  *************************
  */
-    
     #include "mbed.h"
     #include "main.h"
     #include "sstream"
@@ -13,14 +12,9 @@
  *  # Defines
  *************************
  */
- 
  #define IP_STRING  "192.168.1.11";
  #define IP_PORT    "6001";
  #define openStr    "open";
- 
-  string IP = "192.168.1.11";
-  string port = "6001";
-  string open = "open";
   
 /**************************
  *  Pins used: mbed lpc1768
@@ -49,12 +43,17 @@
     uint16_t    _CANIDArrayLength = 0;
     uint16_t    _CANIDAccepted [64];
   
-    bool _isSPIRunning = false;
-    bool _isCANRunning = false;
-    bool _enableCANForUse = true;
-    bool _enableSPIForUse = true;
-    bool _inConfigMode = false;
-    bool _receivingMessage = false;
+    bool _isSPIRunning 		= false;
+    bool _isCANRunning 		= false;
+    bool _enableCANForUse 	= true;
+    bool _enableSPIForUse 	= true;
+    bool _inConfigMode 		= false;
+    bool _receivingMessage 	= false; //We are in the middle of receiving a message;
+	bool _readingComplete 	= false; //We were reading a message, and now it's complete.
+	
+	string IP = "192.168.1.11";
+	string port = "6001";
+	string open = "open";
  
     void initCAN()
     {
@@ -183,7 +182,10 @@
                 pc.printf(writable);
                 serial_spi.writeString(writable);
                 delete[] writable;
-            }   
+            }
+			else{
+				//This is a message that has a messageID  we are not interested in.
+			}
     }
     
     
@@ -193,40 +195,55 @@
         {
             if((can1.read(can_MsgRx)) && (!_inConfigMode))
             {
-                handleCANMessage(can_MsgRx);
+                handleCANMessage(can_MsgRx); //Sending message to Android 
             }
             
             while(serial_spi.readable()) //While we have something to read from SPI (from the Android)
             {
-                char c = (char)serial_spi.getc();
+                char c = (char)serial_spi.getc(); //read Byte from WiFiModule 
                 pc.printf("%c",c);
-                if(c == '[') //<
+                if((c == '[') || (c =='{')) //'[' is the START of a Message '[' = CAN Message, '{' Configuration Message
                 {
                     pc.printf("got start");
                     _receivingMessage = true;
                 }
                  
-                if(c == ']')// >
+                else if((c == ']') || (c == '}'))//']' is the END of a Message '[' = CAN Message, '{' Configuration Message
                 {
                     pc.printf("got end");
                     buffer[buffer_pos] = c;
                     buffer_pos++;
                     //handleInput();
                     _receivingMessage = false;
+					_readingComplete = true;
                 }
                 
-                if(_receivingMessage == true)
+                if(_receivingMessage == true) // in the middle of receiving a message
                 {
                     buffer[buffer_pos] = c;
                     buffer_pos++;
                 }
                 
-                if((buffer[0] == '[' ) && (buffer[31] == ']') && (buffer_pos == 32))
-                {
-                    buffer[0] = '\0';
-                    buffer_pos = 0;
-                    //handleInput();
-                    //we have a CAN message, now handle it.
+                if(_readingComplete == true) //Received a message with complete SOF and EOF.
+				{
+					if((buffer[0] == '[' ) && (buffer[31] == ']') && (buffer_pos == 32))
+					{
+						buffer[0] = '\0';
+						buffer_pos = 0;
+						//handleInput();
+						//we have a CAN message, now handle it.
+					}
+					else if((buffer[0] = '{' ) && (buffer[buffer_pos] == '}')
+					{
+						buffer[0] = '\0';
+						buffer_pos = 0;
+						//handleAConfigMessage
+					}
+					else{
+						//We SHOULDN'T enter here, if we do, clear the buffer, we got a dodgy message
+						buffer[0] = '\0';
+						buffer_pos = 0;
+					}
                 }
             }
         }
