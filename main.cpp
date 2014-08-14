@@ -43,17 +43,17 @@
     uint16_t    _CANIDArrayLength = 0;
     uint16_t    _CANIDAccepted [64];
   
-    bool _isSPIRunning 		= false;
-    bool _isCANRunning 		= false;
-    bool _enableCANForUse 	= true;
-    bool _enableSPIForUse 	= true;
-    bool _inConfigMode 		= false;
-    bool _receivingMessage 	= false; //We are in the middle of receiving a message;
-	bool _readingComplete 	= false; //We were reading a message, and now it's complete.
-	
-	string IP = "192.168.1.11";
-	string port = "6001";
-	string open = "open";
+    bool _isSPIRunning      = false;
+    bool _isCANRunning      = false;
+    bool _enableCANForUse   = true;
+    bool _enableSPIForUse   = true;
+    bool _inConfigMode      = false;
+    bool _receivingMessage  = false; //We are in the middle of receiving a message;
+    bool _readingComplete   = false; //We were reading a message, and now it's complete.
+    
+    string IP = "192.168.1.11";
+    string port = "6001";
+    string open = "open";
  
     void initCAN()
     {
@@ -183,9 +183,9 @@
                 serial_spi.writeString(writable);
                 delete[] writable;
             }
-			else{
-				//This is a message that has a messageID  we are not interested in.
-			}
+            else{
+                //This is a message that has a messageID  we are not interested in.
+            }
     }
     
     
@@ -215,7 +215,7 @@
                     buffer_pos++;
                     //handleInput();
                     _receivingMessage = false;
-					_readingComplete = true;
+                    _readingComplete = true;
                 }
                 
                 if(_receivingMessage == true) // in the middle of receiving a message
@@ -225,33 +225,80 @@
                 }
                 
                 if(_readingComplete == true) //Received a message with complete SOF and EOF.
-				{
-					if((buffer[0] == '[' ) && (buffer[31] == ']') && (buffer_pos == 32))
-					{
-						buffer[0] = '\0';
-						buffer_pos = 0;
-						//handleInput();
-						//we have a CAN message, now handle it.
-					}
-					else if((buffer[0] = '{' ) && (buffer[buffer_pos] == '}')
-					{
-						buffer[0] = '\0';
-						buffer_pos = 0;
-						//handleAConfigMessage
-					}
-					else{
-						//We SHOULDN'T enter here, if we do, clear the buffer, we got a dodgy message
-						buffer[0] = '\0';
-						buffer_pos = 0;
-					}
+                {
+                    if((buffer[0] == '[' ) && (buffer[31] == ']') && (buffer_pos == 32))
+                    {
+                        buffer[0] = '\0';
+                        buffer_pos = 0;
+                        //handleInput();
+                        //we have a CAN message, now handle it.
+                    }
+                    else if((buffer[0] == '{' ) && (buffer[buffer_pos-1] == '}'))
+                    {
+                        _inConfigMode = true; 
+                        buffer[0] = '\0';
+                        buffer_pos = 0;
+                        configMode();
+                        buffer[0] = '\0';
+                        buffer_pos = 0;
+                        //handleAConfigMessage
+                    }
+                    else{
+                        //We SHOULDN'T enter here, if we do, clear the buffer, we got a dodgy message
+                        buffer[0] = '\0';
+                        buffer_pos = 0;
+                    }
                 }
             }
         }
     }
         
-    void configMode(string command)
+    void configMode()
     {
-    
+        char command_type = buffer[1]; //{SI 123}
+        pc.printf("inconfig\n");
+        switch(command_type){
+            case 'S':
+            pc.printf("in switch\n");
+                        if(buffer[2] == 'I'){
+                            pc.printf("in Set ID Case");
+                            std::string stringID = "";
+                            stringID += buffer[3];
+                            stringID += buffer[4];
+                            stringID += buffer[5];//(3,buffer[4]);
+                            pc.printf("This is what you're looking for: ");
+                            char * writable = new char[stringID.size()+1];
+                            std::copy(stringID.begin(), stringID.end(), writable);
+                            writable[stringID.size()] = '\0';
+                            pc.printf(writable);
+                            pc.printf(" -------");
+                            
+                            uint16_t id = canIDStringToInt(stringID);
+                            addNewID(id);
+                            pc.printf("added");
+                            _inConfigMode = false;
+                            //pc.printf(stringID);
+                            //uint16_t = canIDStringToInt(//buffer[3] -> buffer[bufferpos-1]
+                        }
+                        break;
+            
+            case 'R':
+                        if(buffer[2] == 'I'){
+                            //Remove ID
+                        }
+                        break;
+                        
+            case 'E':
+                        if(buffer[2] == 'C'){
+                            //Enter Config
+                        }
+                        break;
+            default:
+                        break;
+        
+        }
+        
+        
     }
     
  

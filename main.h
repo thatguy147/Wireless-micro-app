@@ -18,7 +18,7 @@
    uint16_t canIDStringToInt(string str);
    void handleCommand(string cmdID, string cmd);
    void mainReading();
-   void configMode(string command);
+   void configMode();
    void handleCANMessage(CANMessage can_msg); 
    
 #endif 
