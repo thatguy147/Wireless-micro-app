@@ -98,15 +98,19 @@
         _CANIDArrayLength++;
     }
     
-    void removeID(uint16_t canID)
+    bool removeID(uint16_t canID)
     {
+        bool idRemoved = false;
         for(int i = 0; i <= _CANIDArrayLength; i++)
         {
             if(_CANIDAccepted[i] == canID)
             {
                 _CANIDAccepted[i] = 0x00;
+                idRemoved = true;
             }
         }
+        
+        return idRemoved;
     }
     
     bool isCANIDRecognised(uint16_t id)
@@ -193,7 +197,7 @@
     {
         while(1)
         {
-            if((can1.read(can_MsgRx)) && (!_inConfigMode))
+            if((can1.read(can_MsgRx)) && (_inConfigMode == false))
             {
                 handleCANMessage(can_MsgRx); //Sending message to Android 
             }
@@ -235,19 +239,22 @@
                     }
                     else if((buffer[0] == '{' ) && (buffer[buffer_pos-1] == '}'))
                     {
-                        _inConfigMode = true; 
-                        buffer[0] = '\0';
-                        buffer_pos = 0;
+                        //_inConfigMode = true; 
+                        //buffer[0] = '\0';
+                        //buffer_pos = 0;
                         configMode();
-                        buffer[0] = '\0';
-                        buffer_pos = 0;
-                        //handleAConfigMessage
+                        
                     }
                     else{
                         //We SHOULDN'T enter here, if we do, clear the buffer, we got a dodgy message
+                        pc.printf("We are in the unwanted else");
                         buffer[0] = '\0';
                         buffer_pos = 0;
                     }
+                    
+                    _readingComplete = false; // we are done now, finished our reading, reset buffer.
+                    buffer[0] = '\0';
+                    buffer_pos = 0;
                 }
             }
         }
@@ -265,7 +272,8 @@
                             std::string stringID = "";
                             stringID += buffer[3];
                             stringID += buffer[4];
-                            stringID += buffer[5];//(3,buffer[4]);
+                            stringID += buffer[5];
+                            stringID += buffer[6];
                             pc.printf("This is what you're looking for: ");
                             char * writable = new char[stringID.size()+1];
                             std::copy(stringID.begin(), stringID.end(), writable);
@@ -277,6 +285,9 @@
                             addNewID(id);
                             pc.printf("added");
                             _inConfigMode = false;
+                            serial_spi.writeString("{ID Added}");
+                            serial_spi.writeString(" ");
+                            //serial_spi.flush();
                             //pc.printf(stringID);
                             //uint16_t = canIDStringToInt(//buffer[3] -> buffer[bufferpos-1]
                         }
@@ -284,13 +295,47 @@
             
             case 'R':
                         if(buffer[2] == 'I'){
+                            std::string stringID = "";
+                            stringID += buffer[3];
+                            stringID += buffer[4];
+                            stringID += buffer[5];//(3,buffer[4]);
+                            stringID += buffer[6];
+                            pc.printf("This is what you're looking for: ");
+                            char * writable = new char[stringID.size()+1];
+                            std::copy(stringID.begin(), stringID.end(), writable);
+                            writable[stringID.size()] = '\0';
+                            pc.printf(writable);
+                            pc.printf(" -------");
+                            
+                            uint16_t id = canIDStringToInt(stringID);
+                            bool hasIDBeenRemoved = removeID(id);
+                            if(hasIDBeenRemoved){
+                                serial_spi.writeString("{ID Removed}");
+                                serial_spi.writeString(" ");
+                                //serial_spi.flush();
+                            }
+                            else{
+                                
+                                serial_spi.writeString("ID didn't exist/wasn't removed}");
+                                serial_spi.writeString(" ");
+                                //serial_spi.flush();
+                                
+                            }
+                            pc.printf("removed");
+                            _inConfigMode = false;
                             //Remove ID
                         }
                         break;
                         
             case 'E':
                         if(buffer[2] == 'C'){
-                            //Enter Config
+                            if(_inConfigMode){
+                                _inConfigMode = false;
+                            }
+                            else{
+                                _inConfigMode = true;
+                            }
+                            pc.printf("in the method anyway");
                         }
                         break;
             default:

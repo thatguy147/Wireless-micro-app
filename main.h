@@ -12,7 +12,7 @@
    void initSPI();
    void initDefaultAcceptedID();
    void addNewID(uint16_t canID);
-   void removeID(uint16_t canID);
+   bool removeID(uint16_t canID);
    bool isCANIDRecognised(uint16_t id);
    std::string intToString(int i);
    uint16_t canIDStringToInt(string str);
